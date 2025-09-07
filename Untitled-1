@@ -1,0 +1,8 @@
+Set up a Node.js server with tRPC with a single API endpoint that accepts two PDFs: a job description and a CV. This server uses AI to analyze both files, identifying the candidate's strengths and weaknesses, and evaluates how well they align with the job description. Add basic UI using React and a framework of your choosing.
+
+Focus on DX to ensure easy testing and usability of your solution. Include a clear README with setup and usage instructions. When done, share the repository link.
+
+- Gemini 1.5 Flash endpoint: `https://intertest.woolf.engineering/invoke`
+- Authorization token: to be included in the email, along with the assessment instructions
+- Rate limits: 20 requests/minute, 300 requests/hour
+- Request type: Follow the `GenerateContentRequest` type from the [VertexAI library](https://github.com/googleapis/nodejs-vertexai/blob/4807338c51b3749c86b8e3b71380f4a45722564d/src/types/content.ts#L57)
