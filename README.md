@@ -1,229 +1,234 @@
-# JDMatch - AI-Powered Job Matching
+# JDMatch - Stop Guessing if CVs Match Your Job Posts
 
-A modern web application that uses AI to analyze job descriptions and CVs, providing intelligent matching insights and recommendations.
+Look, I got tired of spending hours figuring out if a candidate's CV actually matches what we're looking for. So I built this thing.
 
-## 🚀 Features
+JDMatch uses AI to compare job descriptions with CVs and tells you if they're a good fit. Upload both documents, get a score and detailed breakdown. Simple as that.
 
-- **PDF Upload & Processing**: Upload job descriptions and CVs as PDF files
-- **AI-Powered Analysis**: Uses Gemini 1.5 Flash for intelligent document analysis
-- **Comprehensive Scoring**: Overall match score with detailed breakdowns
-- **Detailed Insights**: Strengths, weaknesses, key matches, and missing requirements
-- **Actionable Recommendations**: Specific suggestions for improvement
-- **Modern UI**: Built with React, Tailwind CSS, and tRPC
-- **Type Safety**: Full TypeScript support with tRPC
-- **Rate Limiting**: Built-in protection against abuse
+**Try it here**: https://jdm-atch.vercel.app
 
-## 🛠️ Tech Stack
+## Getting Started (Actually Easy This Time)
 
-### Backend
-- **Node.js** with Express
-- **tRPC** for type-safe APIs
-- **pdf-parse** for PDF text extraction
-- **Gemini 1.5 Flash** for AI analysis
-- **Zod** for input validation
-- **Helmet** for security
-- **Rate limiting** for API protection
-
-### Frontend
-- **React 18** with Vite
-- **Tailwind CSS** for styling
-- **tRPC** for type-safe API calls
-- **React Query** for data fetching
-- **React Router** for navigation
-- **React Dropzone** for file uploads
-- **Lucide React** for icons
-
-## 📋 Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-- Gemini API key (provided separately)
-
-## 🚀 Quick Start
-
-### 1. Clone and Install
-
-\`\`\`bash
-git clone <repository-url>
+```bash
+git clone https://github.com/yourusername/JDMatch.git
 cd JDMatch
 npm install
-\`\`\`
+cd server && npm install && cd ../client && npm install && cd ..
+```
 
-### 2. Environment Setup
+Copy the env file and add your API key:
+```bash
+cp .env.example .env
+# Edit .env and add your GEMINI_API_KEY
+```
 
-Copy the example environment file and configure your settings:
-
-\`\`\`bash
-cp env.example .env
-\`\`\`
-
-Edit `.env` with your configuration:
-
-\`\`\`env
-# Server Configuration
-PORT=3001
-NODE_ENV=development
-
-# Gemini API Configuration
-GEMINI_API_URL=https://intertest.woolf.engineering/invoke
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX_REQUESTS=20
-
-# File Upload Configuration
-MAX_FILE_SIZE=10485760
-ALLOWED_FILE_TYPES=application/pdf
-\`\`\`
-
-### 3. Install Dependencies
-
-\`\`\`bash
-# Install root dependencies
-npm install
-
-# Install server dependencies
-cd server && npm install
-
-# Install client dependencies
-cd ../client && npm install
-\`\`\`
-
-### 4. Start Development Servers
-
-\`\`\`bash
-# From the root directory
+Start it up:
+```bash
 npm run dev
-\`\`\`
+```
 
-This will start:
-- Backend server on http://localhost:3001
-- Frontend development server on http://localhost:5173
+That's it. Frontend runs on http://localhost:5173, backend on http://localhost:3001.
 
-## 📁 Project Structure
+## What You Need
 
-\`\`\`
+- Node.js 18 or newer
+
+
+That's literally it. No Docker, no databases, no complicated setup.
+
+## How It Works
+
+Upload a job description and a CV (both as PDFs), and you get:
+
+- Overall match score (0-100)
+- What the candidate is good at
+- What they're missing
+- Breakdown by technical skills, experience, education
+- Whether you should interview them or not
+
+The AI actually reads through both documents and gives you useful insights, not just keyword matching.
+
+## Project Structure
+
+```
 JDMatch/
-├── server/                 # Backend API
-│   ├── index.js           # Express server setup
-│   ├── context.js         # tRPC context
-│   ├── trpc.js            # tRPC configuration
-│   ├── routers/           # API routes
-│   │   ├── index.js       # Main router
-│   │   └── analysis.js    # Analysis endpoints
-│   └── services/          # Business logic
-│       ├── analysisService.js  # AI analysis
-│       └── pdfService.js       # PDF processing
-├── client/                # Frontend React app
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── pages/         # Page components
-│   │   ├── utils/         # Utilities
-│   │   └── main.jsx       # App entry point
-│   ├── index.html
-│   └── vite.config.js
-├── package.json           # Root package.json
-├── vercel.json           # Deployment config
-└── README.md
-\`\`\`
+├── client/          # React frontend
+├── server/          # Node.js backend
+├── test/            # Sample files and tests
+└── package.json     # Scripts to run everything
+```
 
-## 🔧 API Endpoints
+Most of your time will be spent in `client/src` or `server/` folders.
 
-### tRPC Procedures
+## Development
 
-- \`analysis.analyze\` - Analyze text documents directly
-- \`analysis.uploadAndAnalyze\` - Upload PDFs and analyze
+Start both frontend and backend:
+```bash
+npm run dev
+```
 
-### REST Endpoints
+Or run them separately:
+```bash
+npm run dev:client    # Just frontend
+npm run dev:server    # Just backend
+```
 
-- \`GET /health\` - Health check
-- \`POST /api/trpc/*\` - tRPC endpoints
+## Testing Your Changes
 
-## 🧪 Testing
+```bash
+npm test              # Run all tests
+npm run test:watch    # Tests rerun when you change files
+```
 
-\`\`\`bash
-# Run all tests
-npm test
+I've included some sample job descriptions and CVs in the `test/` folder so you can test without needing real files.
 
-# Run server tests only
-npm run server:test
+## API Usage
 
-# Run client tests only
-npm run client:test
-\`\`\`
+The main endpoint is `/api/trpc/analysis.analyze`. Send it job description text and CV text:
 
-## 🚀 Deployment
+```javascript
+{
+  "jobDescription": "We need a React developer...",
+  "cv": "I'm a React developer with 3 years..."
+}
+```
 
-### Vercel (Recommended)
+You get back:
+```javascript
+{
+  "success": true,
+  "data": {
+    "overallScore": 85,
+    "strengths": ["Good React skills", "Solid experience"],
+    "weaknesses": ["No backend experience mentioned"],
+    // ... more details
+  }
+}
+```
 
-1. Connect your repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy automatically on push to main
+There's also an endpoint for uploading PDF files directly if you don't want to extract text first.
 
-### Manual Deployment
+## Configuration
 
-\`\`\`bash
-# Build the application
-npm run build
+Edit `.env` for your setup:
 
-# Start production server
-npm start
-\`\`\`
+```bash
+GEMINI_API_KEY=your_key_here          # Required
+PORT=3001                             # Optional, defaults to 3001
+RATE_LIMIT_MAX_REQUESTS=20           # API calls per minute
+RATE_LIMIT_HOURLY_MAX=300            # API calls per hour
+MAX_FILE_SIZE=10485760               # 10MB file size limit
+```
 
-## 🔒 Environment Variables
+## Common Problems
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| \`PORT\` | Server port | 3001 |
-| \`NODE_ENV\` | Environment | development |
-| \`GEMINI_API_URL\` | Gemini API endpoint | https://intertest.woolf.engineering/invoke |
-| \`GEMINI_API_KEY\` | Gemini API key | Required |
-| \`RATE_LIMIT_WINDOW_MS\` | Rate limit window | 60000 |
-| \`RATE_LIMIT_MAX_REQUESTS\` | Max requests per window | 20 |
-| \`MAX_FILE_SIZE\` | Max file size in bytes | 10485760 |
-| \`ALLOWED_FILE_TYPES\` | Allowed file types | application/pdf |
+**"Can't parse this PDF"**
+- Make sure it's not password protected
+- Some scanned PDFs don't work great
+- Try a different PDF if possible
 
-## 📊 Rate Limits
+**"API key doesn't work"**
+- Double-check you copied it correctly
+- Make sure you're using the right Gemini API endpoint
+- Check if your API has usage limits
 
-- **20 requests per minute** per IP
-- **300 requests per hour** per IP
-- Configurable via environment variables
+**"Frontend won't connect to backend"**
+- Make sure both are running (npm run dev starts both)
+- Check if something else is using port 3001
+- Look at the browser console for errors
 
-## 🛡️ Security Features
+## Deploying
 
-- **Helmet.js** for security headers
-- **CORS** protection
-- **Rate limiting** to prevent abuse
-- **File type validation**
-- **File size limits**
-- **Input validation** with Zod
+I use Vercel because it's simple:
 
-## 🤝 Contributing
+```bash
+npm install -g vercel
+vercel login
+vercel --prod
+```
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+Set these environment variables in Vercel:
+- `GEMINI_API_KEY` - your production API key
+- `NODE_ENV=production`
 
-## 📝 License
+The whole thing deploys as a single app, no separate backend deployment needed.
 
-MIT License - see LICENSE file for details
+## How to Contribute
 
-## 🆘 Support
+Found a bug? Want to add something? Here's how:
 
-For support and questions:
-- Create an issue in the repository
-- Check the documentation
-- Review the example environment configuration
+1. Fork the repo
+2. Make a branch: `git checkout -b your-feature`
+3. Make changes and test them: `npm test`
+4. Push and make a PR
 
-## 🔄 Changelog
+Keep it simple - I'd rather have working code than perfect code.
 
-### v1.0.0
-- Initial release
-- PDF upload and analysis
-- AI-powered matching
-- Modern React UI
-- tRPC integration
-- Rate limiting and security
+## Code Quality Stuff
+
+The project has ESLint and Prettier set up. Run `npm run lint` to check for issues, `npm run format` to fix formatting.
+
+Tests are in the same folders as the code they test, just with `.test.js` endings.
+
+## Why I Built This
+
+Seriously, manual CV screening sucks. You read through dozens of CVs, trying to figure out if someone actually has the skills they claim. Half the time you miss important details or get swayed by irrelevant stuff.
+
+This tool doesn't replace human judgment, but it gives you a solid starting point. Use the AI analysis to decide who's worth a phone screen, then use your brain for the rest.
+
+## Tech Stack
+
+**Backend:**
+- Node.js with Express
+- Invoke API for the AI magic
+- pdf-parse for reading PDF files
+- Some basic rate limiting and security
+
+**Frontend:**
+- React (functional components, hooks)
+- Vite for fast builds
+- Tailwind CSS for styling
+- File upload with drag and drop
+
+Nothing fancy, just solid tools that work.
+
+## Performance
+
+The AI API can be a bit slow sometimes (2-5 seconds), but that's way faster than reading CVs manually.
+
+I've added rate limiting so you don't accidentally spam the API and blow through your quota.
+
+File uploads are limited to 10MB - that should be plenty for any reasonable CV or job description.
+
+## Security
+
+Basic stuff is covered:
+- File type validation (PDFs only)
+- Size limits
+- Rate limiting
+- CORS headers
+- Input sanitization
+
+Don't put sensitive data in your job descriptions or CVs if you're worried about it.
+
+## What's Missing
+
+Some things I might add later:
+- Word doc support (PDFs work better for now)
+- Batch processing multiple CVs
+- Save results to compare candidates
+- Integration with job boards or ATS systems
+
+
+## Getting Help
+
+
+## License
+
+MIT - do whatever you want with it.
+
+## Final Notes
+
+
+The AI isn't perfect - it sometimes misses context or overweights certain keywords. But it's consistently better than my tired brain at 5 PM trying to read the 20th CV of the day.
+
+---

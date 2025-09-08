@@ -1,27 +1,31 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const GEMINI_API_URL = process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyCQuQklW0WMcmbaFpHqOdJkgzqjNgEObi4';
+// Load .env from project root (two levels up from this file)
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-if (!GEMINI_API_KEY) {
-  console.warn('⚠️  GEMINI_API_KEY not found in environment variables');
+const GEMINI_API_URL = process.env.GEMINI_API_URL;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+if (!GEMINI_API_URL || !GEMINI_API_KEY) {
+  console.error('Missing required environment variables:');
+  console.error('GEMINI_API_URL:', GEMINI_API_URL ? 'Set' : 'Missing');
+  console.error('GEMINI_API_KEY:', GEMINI_API_KEY ? 'Set' : 'Missing');
+  console.error('Please check your .env file or environment configuration');
+  process.exit(1);
 }
 
+
 export async function analyzeDocuments(jobDescription, cv) {
-  console.log('🔑 API Key in analysis service:', GEMINI_API_KEY ? 'Present' : 'Missing');
-  console.log('🔗 API URL:', GEMINI_API_URL);
-  console.log('📝 Job Description length:', jobDescription.length);
-  console.log('📝 CV length:', cv.length);
-  console.log('📝 Job Description preview:', jobDescription.substring(0, 200) + '...');
-  console.log('📝 CV preview:', cv.substring(0, 200) + '...');
   
   // Check if we have real PDF content or mock data
   const isMockData = jobDescription.includes('Mock PDF content') || cv.includes('Mock PDF content');
   
   if (isMockData) {
-    console.log('⚠️ Using mock data - PDF parsing may have failed');
     // Return mock analysis data
     return {
     overallScore: 85,
@@ -69,55 +73,34 @@ export async function analyzeDocuments(jobDescription, cv) {
   }
   
   // Implement real AI analysis using Gemini API
-  console.log('🤖 Real PDF content detected - implementing AI analysis...');
   
   try {
     const response = await fetch(GEMINI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': GEMINI_API_KEY,
+        'Authorization': GEMINI_API_KEY,
       },
       body: JSON.stringify({
+        model: "gemini-1.5-flash",
         contents: [
           {
+            role: "user",
             parts: [
               {
-                text: `You are an expert HR analyst. Analyze this job description and CV:
+                text: `Compare the job description and CV and return JSON with overallScore, strengths, weaknesses, alignmentScores, recommendations, summary, keyMatches, and missingRequirements.
 
 Job Description: ${jobDescription}
 
-CV: ${cv}
-
-Please provide a detailed analysis in JSON format with overallScore, strengths, weaknesses, alignment scores, recommendations, summary, keyMatches, and missingRequirements.`
+CV: ${cv}`
               }
             ]
           }
         ],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048
-        },
-        safetySettings: [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_HATE_SPEECH", 
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          }
-        ]
+        generation_config: {
+          max_output_tokens: 800,
+          temperature: 0.7
+        }
       })
     });
 
@@ -126,7 +109,6 @@ Please provide a detailed analysis in JSON format with overallScore, strengths, 
     }
 
     const data = await response.json();
-    console.log('🤖 Gemini API response received');
     
     // Parse the AI response and return structured data
     const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -136,11 +118,34 @@ Please provide a detailed analysis in JSON format with overallScore, strengths, 
 
     // Try to parse JSON from AI response
     try {
-      const parsedResponse = JSON.parse(aiResponse);
-      console.log('🤖 AI analysis completed successfully');
+      // Extract JSON from code block if present
+      let jsonText = aiResponse;
+      if (aiResponse.includes('```json')) {
+        const jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/);
+        if (jsonMatch) {
+          jsonText = jsonMatch[1];
+        }
+      }
+      
+      const parsedResponse = JSON.parse(jsonText);
+      
+      // Transform alignmentScores to alignment format for UI compatibility
+      if (parsedResponse.alignmentScores) {
+        parsedResponse.alignment = {
+          technicalSkills: Math.round((parsedResponse.alignmentScores.skills || 0) * 100),
+          experience: Math.round((parsedResponse.alignmentScores.experience || 0) * 100),
+          education: Math.round((parsedResponse.alignmentScores.qualifications || 0) * 100),
+          softSkills: Math.round((parsedResponse.alignmentScores.responsibilities || 0) * 100)
+        };
+      }
+      
+      // Ensure overallScore is a percentage
+      if (parsedResponse.overallScore && parsedResponse.overallScore <= 1) {
+        parsedResponse.overallScore = Math.round(parsedResponse.overallScore * 100);
+      }
+      
       return parsedResponse;
     } catch (parseError) {
-      console.log('🤖 AI response not in JSON format, using fallback');
       // If AI doesn't return JSON, create structured response from text
       return {
         overallScore: 75,
@@ -159,7 +164,6 @@ Please provide a detailed analysis in JSON format with overallScore, strengths, 
       };
     }
   } catch (error) {
-    console.error('🤖 AI analysis error:', error);
     // Fallback to mock data if AI fails
     return {
     overallScore: 85,

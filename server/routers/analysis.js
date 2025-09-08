@@ -17,7 +17,6 @@ export const analysisRouter = router({
           data: result,
         };
       } catch (error) {
-        console.error('Analysis error:', error);
         throw new Error(`Analysis failed: ${error.message}`);
       }
     }),
@@ -41,7 +40,6 @@ export const analysisRouter = router({
           data: result,
         };
       } catch (error) {
-        console.error('Upload and analysis error:', error);
         throw new Error(`Upload and analysis failed: ${error.message}`);
       }
     }),

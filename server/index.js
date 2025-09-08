@@ -16,8 +16,6 @@ const __dirname = path.dirname(__filename);
 // Load .env from the project root (one level up from server directory)
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
-// Debug: Check if API key is loaded
-console.log('🔑 API Key loaded:', process.env.GEMINI_API_KEY ? 'Yes' : 'No');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,8 +32,8 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting
-const limiter = rateLimit({
+// Rate limiting - Per minute
+const minuteLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000, // 1 minute
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 20, // 20 requests per minute
   message: 'Too many requests from this IP, please try again later.',
@@ -43,7 +41,16 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use('/api/trpc', limiter);
+// Rate limiting - Per hour
+const hourlyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: parseInt(process.env.RATE_LIMIT_HOURLY_MAX) || 300, // 300 requests per hour
+  message: 'Hourly rate limit exceeded, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/trpc', minuteLimiter, hourlyLimiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '100mb' }));
@@ -76,9 +83,7 @@ app.use('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔗 tRPC endpoint: http://localhost:${PORT}/api/trpc`);
+  // Server started successfully
 });
 
 export default app;

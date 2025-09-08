@@ -16,60 +16,94 @@ export function AnalysisPage() {
 
   const analyzeMutation = trpc.analysis.uploadAndAnalyze.useMutation({
     onSuccess: (data) => {
-      console.log('🔍 tRPC Mutation Success:', data);
       // Update local state directly when success callback fires
       let analysisData = data.data || data;
       
       // Check if the summary contains JSON that needs to be parsed
       if (analysisData.summary && analysisData.summary.includes('```json')) {
-        console.log('🔍 Parsing JSON from AI response summary');
         try {
           // Extract JSON from the code block
           const jsonMatch = analysisData.summary.match(/```json\n([\s\S]*?)\n```/);
           if (jsonMatch) {
             const parsedJson = JSON.parse(jsonMatch[1]);
-            console.log('🔍 Parsed JSON from summary:', parsedJson);
-            analysisData = parsedJson;
+            
+            // Merge the parsed data with existing data, prioritizing parsed data
+            analysisData = {
+              ...analysisData,
+              ...parsedJson,
+              // Use existing alignment scores if they're already in the correct format
+              alignment: parsedJson.alignment || analysisData.alignment
+            };
           }
         } catch (error) {
-          console.error('🔍 Error parsing JSON from summary:', error);
+          // Error parsing JSON, continue with original data
         }
       }
       
       setAnalysisData(analysisData);
+      
+      // Store analysis data in localStorage for page refresh
+      localStorage.setItem('analysisData', JSON.stringify(analysisData));
     },
     onError: (error) => {
-      console.log('🔍 tRPC Mutation Error:', error);
+      // Handle error
     },
     onSettled: (data, error) => {
-      console.log('🔍 tRPC Mutation Settled:', { data, error });
+      // Mutation completed
     },
     retry: false,
     retryDelay: 0
   });
 
   useEffect(() => {
+    // Check for files in location.state first
     if (location.state?.jobDescriptionFile && location.state?.cvFile && !hasAnalyzed.current) {
       setJobDescriptionFile(location.state.jobDescriptionFile);
       setCvFile(location.state.cvFile);
+      
+      // Store files in localStorage for page refresh
+      localStorage.setItem('jobDescriptionFile', location.state.jobDescriptionFile);
+      localStorage.setItem('cvFile', location.state.cvFile);
       
       // Mark as analyzed to prevent re-triggering
       hasAnalyzed.current = true;
       
       // Start analysis with full data
-      console.log('🔍 Starting tRPC mutation with data:', {
-        jobDescriptionFileLength: location.state.jobDescriptionFile?.length,
-        cvFileLength: location.state.cvFile?.length,
-        jobDescriptionFilePreview: location.state.jobDescriptionFile?.substring(0, 100),
-        cvFilePreview: location.state.cvFile?.substring(0, 100)
-      });
       
       analyzeMutation.mutate({
         jobDescriptionFile: location.state.jobDescriptionFile,
         cvFile: location.state.cvFile,
       });
-    } else if (!location.state?.jobDescriptionFile || !location.state?.cvFile) {
-      // Redirect to home if no files
+    } 
+    // Check localStorage for files (page refresh scenario)
+    else if (localStorage.getItem('jobDescriptionFile') && localStorage.getItem('cvFile') && !hasAnalyzed.current) {
+      const storedJobFile = localStorage.getItem('jobDescriptionFile');
+      const storedCvFile = localStorage.getItem('cvFile');
+      
+      setJobDescriptionFile(storedJobFile);
+      setCvFile(storedCvFile);
+      
+      // Mark as analyzed to prevent re-triggering
+      hasAnalyzed.current = true;
+      
+      
+      analyzeMutation.mutate({
+        jobDescriptionFile: storedJobFile,
+        cvFile: storedCvFile,
+      });
+    }
+    // Check if we have analysis data in localStorage (already analyzed)
+    else if (localStorage.getItem('analysisData') && !hasAnalyzed.current) {
+      try {
+        const storedAnalysisData = JSON.parse(localStorage.getItem('analysisData'));
+        setAnalysisData(storedAnalysisData);
+        hasAnalyzed.current = true;
+      } catch (error) {
+        localStorage.removeItem('analysisData');
+      }
+    }
+    // No files available, redirect to home
+    else if (!location.state?.jobDescriptionFile && !location.state?.cvFile && !localStorage.getItem('jobDescriptionFile')) {
       navigate('/');
     }
   }, [location.state, navigate]);
@@ -77,6 +111,10 @@ export function AnalysisPage() {
   // Note: We now handle data updates directly in the onSuccess callback
 
   const handleBack = () => {
+    // Clear localStorage when going back
+    localStorage.removeItem('jobDescriptionFile');
+    localStorage.removeItem('cvFile');
+    localStorage.removeItem('analysisData');
     navigate('/');
   };
 
@@ -89,20 +127,9 @@ export function AnalysisPage() {
     }
   };
 
-  // Debug: Log all mutation states
-  console.log('🔍 AnalysisPage - Mutation states:', {
-    isLoading: analyzeMutation.isLoading,
-    isSuccess: analyzeMutation.isSuccess,
-    isError: analyzeMutation.isError,
-    data: analyzeMutation.data,
-    error: analyzeMutation.error,
-    status: analyzeMutation.status,
-    localAnalysisData: analysisData
-  });
 
   // Check if we have analysis data in local state
   if (analysisData) {
-    console.log('🔍 AnalysisPage - Rendering with local analysis data:', analysisData);
     return (
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
