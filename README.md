@@ -152,28 +152,6 @@ Set these environment variables in Vercel:
 
 The whole thing deploys as a single app, no separate backend deployment needed.
 
-## How to Contribute
-
-Found a bug? Want to add something? Here's how:
-
-1. Fork the repo
-2. Make a branch: `git checkout -b your-feature`
-3. Make changes and test them: `npm test`
-4. Push and make a PR
-
-Keep it simple - I'd rather have working code than perfect code.
-
-## Code Quality Stuff
-
-The project has ESLint and Prettier set up. Run `npm run lint` to check for issues, `npm run format` to fix formatting.
-
-Tests are in the same folders as the code they test, just with `.test.js` endings.
-
-## Why I Built This
-
-Seriously, manual CV screening sucks. You read through dozens of CVs, trying to figure out if someone actually has the skills they claim. Half the time you miss important details or get swayed by irrelevant stuff.
-
-This tool doesn't replace human judgment, but it gives you a solid starting point. Use the AI analysis to decide who's worth a phone screen, then use your brain for the rest.
 
 ## Tech Stack
 
