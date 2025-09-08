@@ -1,8 +1,9 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { vi } from 'vitest';
 import { FileUpload } from '../FileUpload';
 
 describe('FileUpload', () => {
-  const mockOnFileSelect = jest.fn();
+  const mockOnFileSelect = vi.fn();
 
   beforeEach(() => {
     mockOnFileSelect.mockClear();

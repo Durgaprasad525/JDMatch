@@ -79,11 +79,20 @@ npm run dev:server    # Just backend
 ## Testing Your Changes
 
 ```bash
-npm test              # Run all tests
-npm run test:watch    # Tests rerun when you change files
+npm test              # Run all tests (frontend + backend)
+npm run client:test   # Run only frontend tests (with watch mode)
+npm run server:test   # Run only backend tests
 ```
 
-I've included some sample job descriptions and CVs in the `test/data/` folder so you can test without needing real files. The actual test files are in `client/src/components/__tests__/` (frontend) and `server/tests/` (backend).
+**Frontend Tests**: Uses Vitest with React Testing Library
+- Tests are in `client/src/components/__tests__/`
+- Run with `npm run client:test` (includes watch mode)
+
+**Backend Tests**: Uses Jest with ES modules support
+- Tests are in `server/tests/`
+- Run with `npm run server:test`
+
+I've included some sample job descriptions and CVs in the `test/data/` folder so you can test without needing real files.
 
 ## API Usage
 
