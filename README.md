@@ -52,8 +52,12 @@ The AI actually reads through both documents and gives you useful insights, not 
 ```
 JDMatch/
 ├── client/          # React frontend
+│   └── src/
+│       └── components/
+│           └── __tests__/  # Frontend tests
 ├── server/          # Node.js backend
-├── test/            # Sample files and tests
+│   └── tests/       # Backend tests
+├── test/            # Sample data files
 └── package.json     # Scripts to run everything
 ```
 
@@ -79,7 +83,7 @@ npm test              # Run all tests
 npm run test:watch    # Tests rerun when you change files
 ```
 
-I've included some sample job descriptions and CVs in the `test/` folder so you can test without needing real files.
+I've included some sample job descriptions and CVs in the `test/data/` folder so you can test without needing real files. The actual test files are in `client/src/components/__tests__/` (frontend) and `server/tests/` (backend).
 
 ## API Usage
 
