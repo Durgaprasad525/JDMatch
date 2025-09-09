@@ -1,7 +1,5 @@
 # JDMatch - Stop Guessing if CVs Match Your Job Posts
 
-Look, I got tired of spending hours figuring out if a candidate's CV actually matches what we're looking for. So I built this thing.
-
 JDMatch uses AI to compare job descriptions with CVs and tells you if they're a good fit. Upload both documents, get a score and detailed breakdown. Simple as that.
 
 **Try it here**: https://jdm-atch.vercel.app
@@ -208,6 +206,8 @@ Some things I might add later:
 - Batch processing multiple CVs
 - Save results to compare candidates
 - Integration with job boards or ATS systems
+- Caching mechanism to avoid redundant invoice processing
+- Duplicate detection for previously analyzed documents
 
 
 ## Getting Help
