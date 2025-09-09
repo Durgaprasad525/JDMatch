@@ -27,7 +27,7 @@ app.use(morgan('combined'));
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-domain.com'] 
+    ? ['https://jdm-atch-fvcajshzi-prasad-yallapus-projects.vercel.app'] 
     : ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
 }));
@@ -82,8 +82,7 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
-  // Server started successfully
-});
+// For Vercel, we don't need app.listen()
+// The serverless function will handle the app
 
 export default app;

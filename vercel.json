@@ -3,11 +3,7 @@
   "builds": [
     {
       "src": "server/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["server/**", "test/**"],
-        "maxDuration": 30
-      }
+      "use": "@vercel/node"
     },
     {
       "src": "client/package.json",
@@ -26,8 +22,5 @@
       "src": "/(.*)",
       "dest": "/client/$1"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }

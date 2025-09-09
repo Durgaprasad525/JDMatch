@@ -16,7 +16,7 @@ cd server && npm install && cd ../client && npm install && cd ..
 Copy the env file and add your API key:
 ```bash
 cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY
+# Edit .env and add your AUTH_TOKEN
 ```
 
 Start it up:
@@ -158,7 +158,7 @@ vercel --prod
 ```
 
 Set these environment variables in Vercel:
-- `GEMINI_API_KEY` - your production API key
+- `AUTH_TOKEN` - your production API key
 - `NODE_ENV=production`
 
 The whole thing deploys as a single app, no separate backend deployment needed.
