@@ -164,49 +164,10 @@ CV: ${cv}`
       };
     }
   } catch (error) {
-    // Fallback to mock data if AI fails
-    return {
-    overallScore: 85,
-    strengths: [
-      "Strong technical background in React and Node.js",
-      "5+ years of relevant experience",
-      "Previous work in similar industry",
-      "Excellent problem-solving skills",
-      "Good communication abilities"
-    ],
-    weaknesses: [
-      "Limited experience with TypeScript",
-      "No experience with cloud platforms (AWS/Azure)",
-      "Gap in employment history (2020-2021)",
-      "Limited leadership experience"
-    ],
-    alignment: {
-      technicalSkills: 80,
-      experience: 90,
-      education: 75,
-      softSkills: 85
-    },
-    recommendations: [
-      "Consider additional training in TypeScript to meet job requirements",
-      "Highlight relevant project experience in cover letter",
-      "Address employment gap with explanation of personal development activities",
-      "Emphasize any leadership or mentoring experience",
-      "Consider obtaining cloud platform certifications"
-    ],
-    summary: "The candidate shows strong potential with relevant technical skills and experience. While there are some gaps in specific technologies mentioned in the job description, the overall profile aligns well with the role requirements. The candidate's experience in similar projects and strong problem-solving skills make them a competitive applicant. With some additional training in the missing technologies, they would be an excellent fit for the position.",
-    keyMatches: [
-      "React development experience",
-      "Node.js backend knowledge",
-      "Agile methodology experience",
-      "Database management skills",
-      "Version control proficiency"
-    ],
-    missingRequirements: [
-      "TypeScript proficiency",
-      "AWS/Cloud experience",
-      "Team leadership experience",
-      "Docker containerization knowledge"
-    ]
-  };
-}
+    // Log the error for debugging
+    console.error('AI Analysis failed:', error.message);
+    
+    // Return error state instead of misleading mock data
+    throw new Error(`Analysis failed: ${error.message}. Please try again later.`);
+  }
 }
