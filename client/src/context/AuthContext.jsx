@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { queryClient } from '../lib/queryClient';
 
 const AuthContext = createContext(null);
 
@@ -7,6 +8,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined); // undefined = loading
   const [user, setUser] = useState(null);
   const [hrUser, setHrUser] = useState(null);
+  const prevUserIdRef = useRef(null);
 
   // Fetch HR user profile from our DB after session is confirmed
   const fetchHrUser = useCallback(async (accessToken) => {
@@ -28,10 +30,19 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      prevUserIdRef.current = session?.user?.id ?? null;
       fetchHrUser(session?.access_token ?? null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const newUserId = session?.user?.id ?? null;
+
+      // If user changed (sign-out, sign-in as different user), clear ALL cached data
+      if (prevUserIdRef.current !== newUserId) {
+        queryClient.clear(); // wipe entire react-query cache
+      }
+      prevUserIdRef.current = newUserId;
+
       setSession(session);
       setUser(session?.user ?? null);
       fetchHrUser(session?.access_token ?? null);
@@ -47,6 +58,7 @@ export function AuthProvider({ children }) {
   };
 
   const signOut = async () => {
+    queryClient.clear(); // clear all cached queries on sign-out
     await supabase.auth.signOut();
     setHrUser(null);
   };
