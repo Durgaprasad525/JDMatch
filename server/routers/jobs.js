@@ -15,6 +15,20 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const API_URL = process.env.API_URL;
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
 
+// ── Valid status transitions ──────────────────────────────────────────────────
+const VALID_TRANSITIONS = {
+  DRAFT:   ['ACTIVE'],
+  ACTIVE:  ['ON_HOLD', 'CLOSED', 'HIRED'],
+  ON_HOLD: ['ACTIVE', 'CLOSED', 'HIRED'],
+  CLOSED:  [],          // terminal
+  HIRED:   ['CLOSED'],  // can close after hiring (reopen not allowed)
+};
+
+// Statuses where new resumes can be uploaded
+const UPLOAD_ALLOWED = ['ACTIVE'];
+// Statuses where interview invites can be sent
+const INVITE_ALLOWED = ['ACTIVE'];
+
 export const jobsRouter = router({
 
   // Generate a JD using AI from basic inputs
@@ -117,6 +131,29 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
       return job;
     }),
 
+  // Edit an existing job (only DRAFT or ACTIVE)
+  update: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      title: z.string().min(1).optional(),
+      description: z.string().min(10).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await prisma.jobPosting.findFirst({
+        where: { id: input.id, companyId: ctx.hrUser.companyId },
+      });
+      if (!job) throw new Error('Job not found.');
+      if (!['DRAFT', 'ACTIVE'].includes(job.status)) {
+        throw new Error('Cannot edit a job that is closed or hired.');
+      }
+
+      const data = {};
+      if (input.title) data.title = input.title;
+      if (input.description) data.description = input.description;
+
+      return prisma.jobPosting.update({ where: { id: input.id }, data });
+    }),
+
   // List all jobs for the HR user's company
   list: protectedProcedure
     .query(async ({ ctx }) => {
@@ -142,7 +179,7 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
       const job = await prisma.jobPosting.findFirst({
         where: {
           id: input.id,
-          companyId: ctx.hrUser.companyId, // scoped to company
+          companyId: ctx.hrUser.companyId,
         },
         include: {
           applications: {
@@ -177,16 +214,19 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
   uploadAndScore: protectedProcedure
     .input(z.object({
       jobId: z.string(),
-      cvFiles: z.array(z.string()).min(1).max(20), // base64 PDFs
+      cvFiles: z.array(z.string()).min(1).max(20),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Verify job belongs to this company
       const job = await prisma.jobPosting.findFirst({
         where: { id: input.jobId, companyId: ctx.hrUser.companyId },
       });
       if (!job) throw new Error('Job not found.');
 
-      // Parse all CVs
+      // Gate: only allow uploads when job is active
+      if (!UPLOAD_ALLOWED.includes(job.status)) {
+        throw new Error(`Cannot upload resumes — job is ${job.status.toLowerCase().replace('_', ' ')}.`);
+      }
+
       const cvTexts = await Promise.allSettled(
         input.cvFiles.map(f => parsePDF(f))
       );
@@ -210,7 +250,7 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
           const name = analysis.candidateName || candidateInfo.name || `Candidate ${i + 1}`;
           const email = analysis.candidateEmail || candidateInfo.email || null;
 
-          // Find existing candidate by email or create new
+          // Find or create candidate (atomic to prevent duplicates)
           let candidate;
           if (email) {
             candidate = await prisma.candidate.findFirst({ where: { email } });
@@ -221,7 +261,15 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
             candidate = await prisma.candidate.create({ data: { name } });
           }
 
-          // Create application with scores
+          // Check for duplicate application (same candidate + same job)
+          const existing = await prisma.application.findFirst({
+            where: { candidateId: candidate.id, jobPostingId: job.id },
+          });
+          if (existing) {
+            results.push({ index: i, success: false, error: `Duplicate: ${name} already applied` });
+            continue;
+          }
+
           const application = await prisma.application.create({
             data: {
               jobPostingId: job.id,
@@ -246,17 +294,106 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
       return { total: cvTexts.length, scored: succeeded, results };
     }),
 
-  // Update job status (ACTIVE, DRAFT, CLOSED)
+  // Update job status with validated transitions
   updateStatus: protectedProcedure
     .input(z.object({
       id: z.string(),
-      status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']),
+      status: z.enum(['DRAFT', 'ACTIVE', 'ON_HOLD', 'CLOSED', 'HIRED']),
     }))
     .mutation(async ({ ctx, input }) => {
-      const job = await prisma.jobPosting.updateMany({
+      const job = await prisma.jobPosting.findFirst({
         where: { id: input.id, companyId: ctx.hrUser.companyId },
-        data: { status: input.status },
       });
-      return { success: job.count > 0 };
+      if (!job) throw new Error('Job not found.');
+
+      const allowed = VALID_TRANSITIONS[job.status] ?? [];
+      if (!allowed.includes(input.status)) {
+        throw new Error(
+          `Cannot change status from "${job.status}" to "${input.status}". Allowed: ${allowed.join(', ') || 'none (terminal state)'}.`
+        );
+      }
+
+      const data = { status: input.status };
+      if (input.status === 'CLOSED' || input.status === 'HIRED') {
+        data.closedAt = new Date();
+      }
+
+      await prisma.jobPosting.update({ where: { id: job.id }, data });
+      return { success: true, from: job.status, to: input.status };
+    }),
+
+  // Update a candidate's application status (select/reject)
+  updateApplicationStatus: protectedProcedure
+    .input(z.object({
+      applicationId: z.string(),
+      status: z.enum(['SELECTED', 'REJECTED']),
+      rejectionReason: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const application = await prisma.application.findFirst({
+        where: {
+          id: input.applicationId,
+          jobPosting: { companyId: ctx.hrUser.companyId },
+        },
+        include: { jobPosting: { select: { status: true } } },
+      });
+      if (!application) throw new Error('Application not found.');
+
+      const data = { status: input.status };
+      if (input.status === 'REJECTED' && input.rejectionReason) {
+        data.rejectionReason = input.rejectionReason;
+      }
+
+      await prisma.application.update({ where: { id: input.applicationId }, data });
+      return { success: true };
+    }),
+
+  // Batch update application statuses
+  batchUpdateApplicationStatus: protectedProcedure
+    .input(z.object({
+      applicationIds: z.array(z.string()).min(1).max(50),
+      status: z.enum(['SELECTED', 'REJECTED']),
+      rejectionReason: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify all belong to this company
+      const apps = await prisma.application.findMany({
+        where: {
+          id: { in: input.applicationIds },
+          jobPosting: { companyId: ctx.hrUser.companyId },
+        },
+        select: { id: true },
+      });
+
+      const validIds = apps.map(a => a.id);
+      if (validIds.length === 0) throw new Error('No valid applications found.');
+
+      const data = { status: input.status };
+      if (input.status === 'REJECTED' && input.rejectionReason) {
+        data.rejectionReason = input.rejectionReason;
+      }
+
+      await prisma.application.updateMany({
+        where: { id: { in: validIds } },
+        data,
+      });
+
+      return { success: true, updated: validIds.length };
+    }),
+
+  // Delete a job (only DRAFT with no applications)
+  delete: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await prisma.jobPosting.findFirst({
+        where: { id: input.id, companyId: ctx.hrUser.companyId },
+        include: { _count: { select: { applications: true } } },
+      });
+      if (!job) throw new Error('Job not found.');
+      if (job.status !== 'DRAFT') throw new Error('Only draft jobs can be deleted.');
+      if (job._count.applications > 0) throw new Error('Cannot delete a job with existing candidates.');
+
+      await prisma.jobPosting.delete({ where: { id: input.id } });
+      return { success: true };
     }),
 });

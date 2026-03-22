@@ -51,6 +51,7 @@ model JobPosting {
   description String    @db.Text
   jdFileUrl   String?
   status      JobStatus @default(ACTIVE)
+  closedAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -66,7 +67,9 @@ model JobPosting {
 enum JobStatus {
   DRAFT
   ACTIVE
+  ON_HOLD
   CLOSED
+  HIRED
 }
 
 // ─── Candidate ───────────────────────────────────────────────────────────────
@@ -98,9 +101,10 @@ model Application {
   weaknesses     String[]
   recommendation String?  @db.Text
 
-  status    ApplicationStatus @default(PENDING)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  status          ApplicationStatus @default(PENDING)
+  rejectionReason String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   candidateId  String
   candidate    Candidate  @relation(fields: [candidateId], references: [id])
@@ -108,6 +112,8 @@ model Application {
   jobPosting   JobPosting @relation(fields: [jobPostingId], references: [id])
 
   interview Interview?
+
+  @@unique([candidateId, jobPostingId])
 }
 
 enum ApplicationStatus {

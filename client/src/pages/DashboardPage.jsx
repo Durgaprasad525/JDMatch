@@ -9,9 +9,11 @@ import { trpc } from '../utils/trpc';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_STYLES = {
-  ACTIVE: { label: 'Active', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
-  DRAFT:  { label: 'Draft',  color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
-  CLOSED: { label: 'Closed', color: 'bg-gray-100 text-gray-500', dot: 'bg-gray-400' },
+  ACTIVE:  { label: 'Active',   color: 'bg-green-100 text-green-700',  dot: 'bg-green-500' },
+  DRAFT:   { label: 'Draft',    color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
+  ON_HOLD: { label: 'On Hold',  color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
+  CLOSED:  { label: 'Closed',   color: 'bg-gray-100 text-gray-500',    dot: 'bg-gray-400' },
+  HIRED:   { label: 'Hired',    color: 'bg-blue-100 text-blue-700',    dot: 'bg-blue-500' },
 };
 
 function StatsBar({ jobs }) {
@@ -59,7 +61,13 @@ function JobCard({ job, onClick }) {
       className="bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-md cursor-pointer transition-all duration-200 group overflow-hidden"
     >
       {/* Status bar */}
-      <div className={`h-1 ${status.dot === 'bg-green-500' ? 'bg-green-500' : status.dot === 'bg-yellow-500' ? 'bg-yellow-400' : 'bg-gray-300'}`} />
+      <div className={`h-1 ${
+        status.dot === 'bg-green-500' ? 'bg-green-500' :
+        status.dot === 'bg-yellow-500' ? 'bg-yellow-400' :
+        status.dot === 'bg-orange-500' ? 'bg-orange-400' :
+        status.dot === 'bg-blue-500' ? 'bg-blue-500' :
+        'bg-gray-300'
+      }`} />
 
       <div className="p-5">
         <div className="flex items-start justify-between mb-3">
@@ -169,9 +177,11 @@ export function DashboardPage() {
 
           {/* Status filter pills */}
           <div className="flex items-center gap-1.5">
-            {['ALL', 'ACTIVE', 'DRAFT', 'CLOSED'].map(s => {
-              const isActive = filterStatus === s;
+            {['ALL', 'ACTIVE', 'DRAFT', 'ON_HOLD', 'HIRED', 'CLOSED'].map(s => {
               const count = s === 'ALL' ? jobs.length : jobs.filter(j => j.status === s).length;
+              if (s !== 'ALL' && count === 0) return null; // hide empty filters
+              const isActive = filterStatus === s;
+              const label = s === 'ALL' ? 'All' : (STATUS_STYLES[s]?.label ?? s);
               return (
                 <button
                   key={s}
@@ -182,7 +192,7 @@ export function DashboardPage() {
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  {s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()} ({count})
+                  {label} ({count})
                 </button>
               );
             })}

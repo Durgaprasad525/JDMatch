@@ -94,6 +94,12 @@ export const interviewsRouter = router({
           continue;
         }
 
+        // Gate: only allow invites when job is active
+        if (application.jobPosting.status !== 'ACTIVE') {
+          results.push({ applicationId, success: false, error: `Job is ${application.jobPosting.status.toLowerCase()}` });
+          continue;
+        }
+
         // Create or retrieve existing interview
         let interview = await prisma.interview.findUnique({
           where: { applicationId },
