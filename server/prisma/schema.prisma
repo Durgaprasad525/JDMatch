@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Company ─────────────────────────────────────────────────────────────────
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String?  @unique
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hrUsers     HRUser[]
+  jobPostings JobPosting[]
+}
+
+// ─── HR User ─────────────────────────────────────────────────────────────────
+
+model HRUser {
+  id         String @id @default(cuid())
+  supabaseId String @unique
+  email      String @unique
+  name       String
+  role       HRRole @default(RECRUITER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId   String
+  company     Company      @relation(fields: [companyId], references: [id])
+  jobPostings JobPosting[]
+}
+
+enum HRRole {
+  ADMIN
+  RECRUITER
+}
+
+// ─── Job Posting ─────────────────────────────────────────────────────────────
+
+model JobPosting {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @db.Text
+  jdFileUrl   String?
+  status      JobStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdById String
+  createdBy   HRUser   @relation(fields: [createdById], references: [id])
+
+  applications Application[]
+}
+
+enum JobStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+// ─── Candidate ───────────────────────────────────────────────────────────────
+
+model Candidate {
+  id    String  @id @default(cuid())
+  name  String
+  email String?
+  phone String?
+
+  createdAt DateTime @default(now())
+
+  applications Application[]
+}
+
+// ─── Application ─────────────────────────────────────────────────────────────
+
+model Application {
+  id             String  @id @default(cuid())
+  resumeFileUrl  String?
+  resumeText     String? @db.Text
+
+  // AI screening scores
+  score          Float?
+  technicalScore Float?
+  softSkillScore Float?
+  cultureScore   Float?
+  strengths      String[]
+  weaknesses     String[]
+  recommendation String?  @db.Text
+
+  status    ApplicationStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  candidateId  String
+  candidate    Candidate  @relation(fields: [candidateId], references: [id])
+  jobPostingId String
+  jobPosting   JobPosting @relation(fields: [jobPostingId], references: [id])
+
+  interview Interview?
+}
+
+enum ApplicationStatus {
+  PENDING
+  SCORED
+  INTERVIEW_INVITED
+  INTERVIEWED
+  SELECTED
+  REJECTED
+}
+
+// ─── Interview ────────────────────────────────────────────────────────────────
+
+model Interview {
+  id          String   @id @default(cuid())
+  token       String   @unique @default(cuid()) // candidate invite token
+  scheduledAt DateTime?
+  completedAt DateTime?
+
+  // Vapi / voice AI
+  vapiCallId       String?
+  vapiAssistantId  String?
+  transcript       String?  @db.Text
+  summary          String?  @db.Text
+  aiScore          Float?
+  aiNotes          String?  @db.Text
+
+  // Anti-cheat signals
+  tabSwitches      Int @default(0)
+  copyPasteEvents  Int @default(0)
+  cameraOffEvents  Int @default(0)
+  aiDetectionScore Float?
+
+  status    InterviewStatus @default(SCHEDULED)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  applicationId String      @unique
+  application   Application @relation(fields: [applicationId], references: [id])
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}

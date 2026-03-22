@@ -22,11 +22,7 @@ const API_URL = process.env.API_URL;
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
 
 if (!API_URL || !AUTH_TOKEN) {
-  console.error('Missing required environment variables:');
-  console.error('API_URL:', API_URL ? 'Set' : 'Missing');
-  console.error('AUTH_TOKEN:', AUTH_TOKEN ? 'Set' : 'Missing');
-  console.error('Please check your .env file or environment configuration');
-  process.exit(1);
+  console.warn('Warning: API_URL and/or AUTH_TOKEN are not set. AI analysis will be unavailable.');
 }
 
 /**
@@ -222,6 +218,86 @@ function createMockResponse() {
 }
 
 /**
+ * Scores an interview transcript against the job description
+ * @param {string} transcript - Full interview transcript
+ * @param {string} jobDescription - The job posting text
+ * @returns {Promise<{score: number, notes: string}>}
+ */
+export async function scoreInterview(transcript, jobDescription) {
+  if (!API_URL || !AUTH_TOKEN) {
+    return { score: null, notes: 'AI scoring not configured.' };
+  }
+  if (!transcript || transcript.length < 50) {
+    return { score: null, notes: 'Transcript too short to score.' };
+  }
+
+  let response;
+  try {
+    response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': AUTH_TOKEN,
+      },
+      body: JSON.stringify({
+        model: API_CONFIG.MODEL,
+        contents: [{
+          role: 'user',
+          parts: [{
+            text: `You are an expert HR interviewer. Evaluate the following AI interview transcript against the job description.
+
+Return a JSON object with:
+- score: number 0-100 (overall interview performance)
+- communicationScore: number 0-100
+- technicalScore: number 0-100
+- confidenceScore: number 0-100
+- notes: string (2-3 sentence summary of candidate performance)
+- strengths: array of strings (top 3 interview strengths)
+- concerns: array of strings (top 3 concerns or gaps revealed in interview)
+
+Job Description:
+${jobDescription?.slice(0, 2000)}
+
+Interview Transcript:
+${transcript.slice(0, 8000)}`
+          }]
+        }],
+        generation_config: {
+          max_output_tokens: 600,
+          temperature: 0.3,
+        }
+      })
+    });
+  } catch (err) {
+    console.error('Interview scoring API error:', err.message);
+    return { score: null, notes: 'AI scoring failed.' };
+  }
+
+  if (!response.ok) {
+    return { score: null, notes: `AI scoring failed (HTTP ${response.status}).` };
+  }
+
+  try {
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/```\n?([\s\S]*?)\n?```/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[1] : text);
+    return {
+      score: typeof parsed.score === 'number' ? Math.min(100, Math.max(0, parsed.score)) : null,
+      communicationScore: parsed.communicationScore ?? null,
+      technicalScore: parsed.technicalScore ?? null,
+      confidenceScore: parsed.confidenceScore ?? null,
+      notes: parsed.notes || '',
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+      concerns: Array.isArray(parsed.concerns) ? parsed.concerns : [],
+    };
+  } catch (err) {
+    console.error('Interview scoring parse error:', err.message);
+    return { score: null, notes: 'AI scoring response could not be parsed.' };
+  }
+}
+
+/**
  * Analyzes job description against CV using AI service
  * @param {string} jobDescription - The job posting text
  * @param {string} cv - The candidate's CV text
@@ -230,6 +306,11 @@ function createMockResponse() {
  * @throws {APIError} When API call fails
  */
 export async function analyzeDocuments(jobDescription, cv) {
+  // Check credentials before doing anything
+  if (!API_URL || !AUTH_TOKEN) {
+    throw new Error('AI analysis is not configured. API_URL and AUTH_TOKEN environment variables are required.');
+  }
+
   // Step 1: Validate inputs
   try {
     validateInputs(jobDescription, cv);
@@ -258,7 +339,7 @@ export async function analyzeDocuments(jobDescription, cv) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': AUTH_TOKEN, 
+        'Authorization': AUTH_TOKEN,
       },
       body: JSON.stringify({
         model: API_CONFIG.MODEL,
@@ -267,7 +348,20 @@ export async function analyzeDocuments(jobDescription, cv) {
             role: "user",
             parts: [
               {
-                text: `Compare the job description and CV and return JSON with overallScore, strengths, weaknesses, alignmentScores, recommendations, summary, keyMatches, and missingRequirements.
+                text: `Compare the job description and CV and return JSON with candidateName, candidateEmail, overallScore, strengths, weaknesses, alignmentScores, recommendations, summary, keyMatches, and missingRequirements.
+
+IMPORTANT SCORING GUIDELINES:
+- overallScore: A number from 0-100 representing the percentage match between the candidate and the job requirements. 
+  * 80-100: Excellent match, candidate has most/all required skills and experience
+  * 60-79: Good match, candidate has many required skills but some gaps
+  * 40-59: Moderate match, candidate has some relevant skills but significant gaps
+  * 20-39: Poor match, candidate has few relevant skills
+  * 0-19: Very poor match, candidate lacks most required skills
+- The overallScore MUST be calculated based on how well the candidate's skills, experience, and qualifications align with the job requirements.
+- If the candidate is clearly NOT suitable (e.g., wrong field, lacks core requirements), the score should be LOW (0-30), NOT high.
+- alignmentScores: Object with scores from 0-1 (where 1 = perfect match) for each requirement category mentioned in the job description.
+
+Extract the candidate's name and email from the CV. The candidateName should be the person's full name, and candidateEmail should be their email address.
 
 Job Description: ${jobDescription}
 
@@ -327,20 +421,142 @@ CV: ${cv}`
     
     const parsedResponse = JSON.parse(jsonText);
     
+    // Extract candidate information (name and email)
+    // These may come from AI or will be extracted from CV text as fallback
+    const candidateName = parsedResponse.candidateName || null;
+    const candidateEmail = parsedResponse.candidateEmail || null;
+    
+    // Store candidate info in response
+    if (candidateName) parsedResponse.candidateName = candidateName;
+    if (candidateEmail) parsedResponse.candidateEmail = candidateEmail;
+    
     // Transform alignmentScores to alignment format for UI compatibility
+    let calculatedAlignmentAvg = null;
     if (parsedResponse.alignmentScores) {
+      // Handle different alignmentScores structures
+      const scores = parsedResponse.alignmentScores;
+      
+      // Calculate average from ALL raw alignmentScores FIRST for validation
+      const rawScoreValues = Object.values(scores).filter(v => typeof v === 'number' && v >= 0 && v <= 1);
+      if (rawScoreValues.length > 0) {
+        const avgRaw = rawScoreValues.reduce((sum, val) => sum + val, 0) / rawScoreValues.length;
+        calculatedAlignmentAvg = Math.round(avgRaw * 100);
+      } else {
+        // If scores are already in percentage format (0-100), use them directly
+        const percentageScoreValues = Object.values(scores).filter(v => typeof v === 'number' && v >= 0 && v <= 100);
+        if (percentageScoreValues.length > 0) {
+          calculatedAlignmentAvg = Math.round(
+            percentageScoreValues.reduce((sum, val) => sum + val, 0) / percentageScoreValues.length
+          );
+        }
+      }
+      
+      // Map to standard alignment format for UI
       parsedResponse.alignment = {
-        technicalSkills: Math.round((parsedResponse.alignmentScores.skills || 0) * 100),
-        experience: Math.round((parsedResponse.alignmentScores.experience || 0) * 100),
-        education: Math.round((parsedResponse.alignmentScores.qualifications || 0) * 100),
-        softSkills: Math.round((parsedResponse.alignmentScores.responsibilities || 0) * 100)
+        technicalSkills: Math.round((scores.skills || scores['HR Information Systems'] || 0) * (scores.skills !== undefined ? 100 : 1)),
+        experience: Math.round((scores.experience || scores['Employee relations'] || 0) * (scores.experience !== undefined ? 100 : 1)),
+        education: Math.round((scores.qualifications || scores['Training and development'] || 0) * (scores.qualifications !== undefined ? 100 : 1)),
+        softSkills: Math.round((scores.responsibilities || scores['Oral and written management communication skills'] || 0) * (scores.responsibilities !== undefined ? 100 : 1))
       };
+      
+      // If mapped alignment is all zeros but we have calculated avg, recalculate alignment
+      const alignmentSum = Object.values(parsedResponse.alignment).reduce((sum, val) => sum + val, 0);
+      if (alignmentSum === 0 && calculatedAlignmentAvg !== null && calculatedAlignmentAvg > 0) {
+        // Redistribute the calculated average across alignment categories
+        parsedResponse.alignment = {
+          technicalSkills: Math.round(calculatedAlignmentAvg * 0.3),
+          experience: Math.round(calculatedAlignmentAvg * 0.3),
+          education: Math.round(calculatedAlignmentAvg * 0.2),
+          softSkills: Math.round(calculatedAlignmentAvg * 0.2)
+        };
+      }
+    } else if (parsedResponse.alignment) {
+      // If no alignmentScores but alignment exists, calculate from alignment
+      const alignmentValues = Object.values(parsedResponse.alignment).filter(v => typeof v === 'number');
+      if (alignmentValues.length > 0) {
+        calculatedAlignmentAvg = Math.round(
+          alignmentValues.reduce((sum, val) => sum + val, 0) / alignmentValues.length
+        );
+      }
     }
     
-    // Ensure overallScore is a percentage
-    if (parsedResponse.overallScore && parsedResponse.overallScore <= 1) {
-      parsedResponse.overallScore = Math.round(parsedResponse.overallScore * 100);
+    // Normalize overallScore to percentage (0-100)
+    let normalizedScore = 0;
+    if (parsedResponse.overallScore !== undefined && parsedResponse.overallScore !== null) {
+      let score = Number(parsedResponse.overallScore);
+      
+      // Handle NaN or invalid numbers
+      if (isNaN(score)) {
+        console.warn(`Invalid overallScore value: ${parsedResponse.overallScore}, defaulting to 0`);
+        score = 0;
+      }
+      // If score is between 0 and 1 (exclusive), it's a decimal (e.g., 0.75 = 75%)
+      else if (score > 0 && score < 1) {
+        score = Math.round(score * 100);
+      }
+      // If score is exactly 1, it could be 1% or 100% - check context
+      else if (score === 1) {
+        // If alignment scores suggest low match, treat as 1%, otherwise 100%
+        if (calculatedAlignmentAvg !== null && calculatedAlignmentAvg < 30) {
+          score = 1;
+        } else {
+          score = 100;
+        }
+      }
+      // If score is between 1 and 100 (exclusive), treat as percentage already
+      else if (score > 1 && score < 100) {
+        score = Math.round(score);
+      }
+      // If score is >= 100, cap at 100
+      else if (score >= 100) {
+        score = 100;
+      }
+      // If score is negative or 0, set to 0
+      else if (score <= 0) {
+        score = 0;
+      }
+      
+      normalizedScore = score;
     }
+    
+    // Validate score consistency - check if overallScore contradicts alignment scores
+    if (calculatedAlignmentAvg !== null && normalizedScore > calculatedAlignmentAvg + 30) {
+      // Large discrepancy detected - AI may have returned wrong score
+      console.warn(`Score inconsistency detected: overallScore=${normalizedScore}, alignmentAvg=${calculatedAlignmentAvg}. Recalculating from alignment scores.`);
+      
+      // Check recommendations/summary for negative language
+      const recommendations = Array.isArray(parsedResponse.recommendations) 
+        ? parsedResponse.recommendations.join(' ').toLowerCase()
+        : (parsedResponse.recommendations || '').toLowerCase();
+      const summary = (parsedResponse.summary || '').toLowerCase();
+      const combinedText = recommendations + ' ' + summary;
+      
+      const negativeIndicators = [
+        'not suitable', 'not a good fit', 'poor fit', 'not aligned',
+        'lack of', 'no direct experience', 'does not align', 'not relevant',
+        'unsuitable', 'inappropriate', 'mismatch'
+      ];
+      
+      const hasNegativeLanguage = negativeIndicators.some(indicator => 
+        combinedText.includes(indicator)
+      );
+      
+      // If negative language found and score is high, recalculate
+      if (hasNegativeLanguage && normalizedScore > 50) {
+        console.warn(`Negative language detected in analysis but score is ${normalizedScore}%. Using calculated score from alignment.`);
+        normalizedScore = Math.max(calculatedAlignmentAvg, 10); // Use alignment avg or minimum 10%
+      } else if (normalizedScore > calculatedAlignmentAvg + 20) {
+        // Even without negative language, if discrepancy is large, use weighted average
+        normalizedScore = Math.round((normalizedScore * 0.3) + (calculatedAlignmentAvg * 0.7));
+      }
+    }
+    
+    // If no overallScore was provided, calculate from alignment
+    if (parsedResponse.overallScore === undefined || parsedResponse.overallScore === null) {
+      normalizedScore = calculatedAlignmentAvg !== null ? calculatedAlignmentAvg : 0;
+    }
+    
+    parsedResponse.overallScore = normalizedScore;
 
     // Validate required fields are present
     const requiredFields = ['overallScore', 'strengths', 'weaknesses'];

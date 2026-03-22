@@ -20,6 +20,19 @@ export function AnalysisResults({ data }) {
     missingRequirements = []
   } = data;
 
+  // Normalize array fields - AI sometimes returns strings instead of arrays
+  const normalizeToArray = (value) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string' && value.trim()) return [value];
+    return [];
+  };
+
+  const normalizedStrengths = normalizeToArray(strengths);
+  const normalizedWeaknesses = normalizeToArray(weaknesses);
+  const normalizedRecommendations = normalizeToArray(recommendations);
+  const normalizedKeyMatches = normalizeToArray(keyMatches);
+  const normalizedMissingRequirements = normalizeToArray(missingRequirements);
+
   const getScoreColor = (score) => {
     if (score >= 80) return 'text-green-600';
     if (score >= 60) return 'text-yellow-600';
@@ -98,12 +111,16 @@ export function AnalysisResults({ data }) {
             <h3 className="text-xl font-semibold text-gray-900">Strengths</h3>
           </div>
           <ul className="space-y-3">
-            {strengths.map((strength, index) => (
-              <li key={index} className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-                <span className="text-gray-700">{strength}</span>
-              </li>
-            ))}
+            {normalizedStrengths.length > 0 ? (
+              normalizedStrengths.map((strength, index) => (
+                <li key={index} className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <span className="text-gray-700">{strength}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-gray-500 italic">No strengths listed</li>
+            )}
           </ul>
         </div>
 
@@ -114,12 +131,16 @@ export function AnalysisResults({ data }) {
             <h3 className="text-xl font-semibold text-gray-900">Areas for Improvement</h3>
           </div>
           <ul className="space-y-3">
-            {weaknesses.map((weakness, index) => (
-              <li key={index} className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
-                <span className="text-gray-700">{weakness}</span>
-              </li>
-            ))}
+            {normalizedWeaknesses.length > 0 ? (
+              normalizedWeaknesses.map((weakness, index) => (
+                <li key={index} className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <span className="text-gray-700">{weakness}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-gray-500 italic">No areas for improvement listed</li>
+            )}
           </ul>
         </div>
       </div>
@@ -132,12 +153,16 @@ export function AnalysisResults({ data }) {
             <h3 className="text-xl font-semibold text-gray-900">Key Matches</h3>
           </div>
           <ul className="space-y-3">
-            {keyMatches.map((match, index) => (
-              <li key={index} className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                <span className="text-gray-700">{match}</span>
-              </li>
-            ))}
+            {normalizedKeyMatches.length > 0 ? (
+              normalizedKeyMatches.map((match, index) => (
+                <li key={index} className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <span className="text-gray-700">{match}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-gray-500 italic">No key matches listed</li>
+            )}
           </ul>
         </div>
 
@@ -148,12 +173,16 @@ export function AnalysisResults({ data }) {
             <h3 className="text-xl font-semibold text-gray-900">Missing Requirements</h3>
           </div>
           <ul className="space-y-3">
-            {missingRequirements.map((requirement, index) => (
-              <li key={index} className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
-                <span className="text-gray-700">{requirement}</span>
-              </li>
-            ))}
+            {normalizedMissingRequirements.length > 0 ? (
+              normalizedMissingRequirements.map((requirement, index) => (
+                <li key={index} className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <span className="text-gray-700">{requirement}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-gray-500 italic">No missing requirements listed</li>
+            )}
           </ul>
         </div>
       </div>
@@ -165,12 +194,16 @@ export function AnalysisResults({ data }) {
           <h3 className="text-xl font-semibold text-gray-900">Recommendations</h3>
         </div>
         <ul className="space-y-3">
-          {recommendations.map((recommendation, index) => (
-            <li key={index} className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
-              <span className="text-gray-700">{recommendation}</span>
-            </li>
-          ))}
+          {normalizedRecommendations.length > 0 ? (
+            normalizedRecommendations.map((recommendation, index) => (
+              <li key={index} className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                <span className="text-gray-700">{recommendation}</span>
+              </li>
+            ))
+          ) : (
+            <li className="text-gray-500 italic">No recommendations provided</li>
+          )}
         </ul>
       </div>
     </div>

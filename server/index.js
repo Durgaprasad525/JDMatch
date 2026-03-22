@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from './routers/index.js';
 import { createContext } from './context.js';
+import { handleVapiWebhook } from './routers/interviews.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -15,6 +16,7 @@ const __dirname = path.dirname(__filename);
 
 // Load .env from the project root (one level up from server directory)
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
+
 
 
 const app = express();
@@ -62,6 +64,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Vapi webhook — plain POST route (bypasses tRPC for compatibility)
+app.post('/api/vapi-webhook', async (req, res) => {
+  try {
+    await handleVapiWebhook(req.body);
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Vapi webhook error:', err.message);
+    res.status(200).json({ received: true }); // always 200 so Vapi doesn't retry
+  }
+});
+
 // tRPC middleware
 app.use('/api/trpc', createExpressMiddleware({
   router: appRouter,
@@ -84,5 +97,13 @@ app.use('*', (req, res) => {
 
 // For Vercel, we don't need app.listen()
 // The serverless function will handle the app
+// But for local development, we need to start the server
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📡 tRPC endpoint: http://localhost:${PORT}/api/trpc`);
+    console.log(`❤️  Health check: http://localhost:${PORT}/health`);
+  });
+}
 
 export default app;
