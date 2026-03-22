@@ -646,7 +646,7 @@ export function InterviewPage() {
   const finalTranscript = transcript.filter(t => t.final);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white flex flex-col overflow-hidden">
       {/* Top bar */}
       <div className="border-b border-gray-800/80 bg-gray-900/60 backdrop-blur-md px-4 sm:px-6 py-3">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -681,11 +681,11 @@ export function InterviewPage() {
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col lg:flex-row max-w-5xl mx-auto w-full">
+      {/* Main content — fixed height, no scroll on outer container */}
+      <div className="flex-1 flex flex-col lg:flex-row max-w-5xl mx-auto w-full min-h-0 overflow-hidden">
 
-        {/* Left: Video + AI avatar + controls */}
-        <div className="flex flex-col items-center justify-center px-4 py-8 lg:w-1/2">
+        {/* Left: Video + AI avatar + controls — vertically centered, never scrolls */}
+        <div className="flex flex-col items-center justify-center px-4 py-8 lg:w-1/2 flex-shrink-0">
 
           {/* AI Avatar */}
           <PulseRing active={true}>
@@ -757,8 +757,8 @@ export function InterviewPage() {
           </div>
         </div>
 
-        {/* Right: Live transcript */}
-        <div className="flex flex-col lg:w-1/2 border-t lg:border-t-0 lg:border-l border-gray-800/80">
+        {/* Right: Live transcript — fixed height, scrolls internally */}
+        <div className="flex flex-col lg:w-1/2 border-t lg:border-t-0 lg:border-l border-gray-800/80 min-h-0 overflow-hidden">
           {/* Transcript header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800/80">
             <div className="flex items-center gap-2">
@@ -778,9 +778,9 @@ export function InterviewPage() {
             </button>
           </div>
 
-          {/* Transcript messages */}
+          {/* Transcript messages — scrolls within its own container */}
           {showTranscript && (
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 max-h-[60vh] lg:max-h-none">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-0">
               {finalTranscript.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="p-3 bg-gray-800 rounded-xl mb-3">
