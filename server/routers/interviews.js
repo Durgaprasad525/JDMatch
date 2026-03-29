@@ -7,18 +7,22 @@ import { scoreInterview } from '../services/analysisService.js';
 // Standalone handler used by the plain Express webhook route
 export async function handleVapiWebhook(body) {
   const message = body?.message;
+  console.log(`[Webhook Handler] message.type=${message?.type}, hasCall=${!!message?.call}, callId=${message?.call?.id}`);
   if (!message || message.type !== 'end-of-call-report') return;
 
   const callId = message.call?.id;
-  if (!callId) return;
+  if (!callId) { console.log('[Webhook Handler] No callId found'); return; }
 
+  console.log(`[Webhook Handler] Looking up interview with vapiCallId=${callId}`);
   const interview = await prisma.interview.findFirst({
     where: { vapiCallId: callId },
   });
-  if (!interview) return;
+  if (!interview) { console.log('[Webhook Handler] No interview found for callId'); return; }
+  console.log(`[Webhook Handler] Found interview id=${interview.id}`);
 
-  const transcript = message.artifact?.transcript || null;
-  const summary = message.artifact?.summary || null;
+  const transcript = message.artifact?.transcript || message.transcript || null;
+  const summary = message.artifact?.summary || message.summary || message.analysis?.summary || null;
+  console.log(`[Webhook Handler] transcript=${transcript ? 'yes (len=' + (typeof transcript === 'string' ? transcript.length : JSON.stringify(transcript).length) + ')' : 'null'}, summary=${summary ? 'yes' : 'null'}`);
 
   const interviewWithJob = await prisma.interview.findUnique({
     where: { id: interview.id },
@@ -29,11 +33,19 @@ export async function handleVapiWebhook(body) {
     },
   });
 
+  // Normalize transcript to string if it's an array of objects
+  let transcriptStr = transcript;
+  if (Array.isArray(transcript)) {
+    transcriptStr = transcript.map(t => `${t.role || 'unknown'}: ${t.message || t.content || ''}`).join('\n');
+  }
+
   let aiResult = { score: null, notes: null };
-  if (transcript) {
+  if (transcriptStr) {
     try {
       const jobDesc = interviewWithJob?.application?.jobPosting?.description || '';
-      aiResult = await scoreInterview(transcript, jobDesc);
+      console.log(`[Webhook Handler] Scoring interview... transcript length=${transcriptStr.length}`);
+      aiResult = await scoreInterview(transcriptStr, jobDesc);
+      console.log(`[Webhook Handler] Score result: score=${aiResult.score}`);
     } catch (err) {
       console.error('Interview scoring error:', err.message);
     }
@@ -44,8 +56,8 @@ export async function handleVapiWebhook(body) {
     data: {
       status: 'COMPLETED',
       completedAt: new Date(),
-      transcript,
-      summary,
+      transcript: typeof transcriptStr === 'string' ? transcriptStr : JSON.stringify(transcript),
+      summary: typeof summary === 'string' ? summary : JSON.stringify(summary),
       aiScore: aiResult.score,
       aiNotes: aiResult.notes
         ? JSON.stringify({
