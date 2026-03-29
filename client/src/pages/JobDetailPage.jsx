@@ -6,7 +6,7 @@ import {
   CheckCircle, Clock, XCircle, FileText, Briefcase, AlertCircle,
   Send, Copy, Shield, Mic, MessageSquare, Trophy,
   PauseCircle, PlayCircle, Award, Ban, MoreHorizontal,
-  ThumbsUp, ThumbsDown, Download,
+  ThumbsUp, ThumbsDown, Download, Pencil, Check, X,
 } from 'lucide-react';
 import { trpc } from '../utils/trpc';
 
@@ -461,6 +461,93 @@ function TopCandidatesSpotlight({ applications }) {
   );
 }
 
+// ─── Candidate name/email with inline edit + resume download ────────────────
+function CandidateInfo({ app, onChanged }) {
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(app.candidate.name);
+  const [editEmail, setEditEmail] = useState(app.candidate.email || '');
+
+  const updateCandidate = trpc.jobs.updateCandidate.useMutation({
+    onSuccess: () => { setEditing(false); onChanged?.(); },
+  });
+
+  const handleSave = () => {
+    const name = editName.trim();
+    if (!name) return;
+    updateCandidate.mutate({
+      applicationId: app.id,
+      name,
+      email: editEmail.trim() || null,
+    });
+  };
+
+  if (editing) {
+    return (
+      <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <input
+            autoFocus
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            placeholder="Candidate name"
+            className="text-sm font-semibold border border-gray-300 rounded-lg px-2 py-1 w-40 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+          />
+          <input
+            value={editEmail}
+            onChange={(e) => setEditEmail(e.target.value)}
+            placeholder="email@example.com"
+            className="text-xs border border-gray-300 rounded-lg px-2 py-1 w-44 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+          />
+          <button onClick={handleSave} disabled={updateCandidate.isLoading}
+            className="p-1 rounded-md bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
+            <Check className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => { setEditing(false); setEditName(app.candidate.name); setEditEmail(app.candidate.email || ''); }}
+            className="p-1 rounded-md bg-gray-50 text-gray-400 hover:bg-gray-100 transition-colors">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-1.5">
+        <p className="font-semibold text-gray-900 text-sm truncate">{app.candidate.name}</p>
+        <button
+          onClick={() => setEditing(true)}
+          title="Edit candidate info"
+          className="p-0.5 rounded text-gray-300 hover:text-primary-500 hover:bg-primary-50 transition-colors"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+        <CandidateActions app={app} onChanged={onChanged} />
+      </div>
+      <div className="flex items-center gap-2 mt-0.5">
+        {app.candidate.email && (
+          <p className="text-xs text-gray-400 truncate">{app.candidate.email}</p>
+        )}
+        {app.resumeFileUrl && (
+          <a
+            href={app.resumeFileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Download Resume"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary-50 text-primary-600 hover:bg-primary-100 ring-1 ring-primary-200 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Download className="h-3 w-3" />
+            Resume
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Unified candidate row ───────────────────────────────────────────────────
 function CandidateRow({ app, rank, jobStatus, onChanged }) {
   const [expanded, setExpanded] = useState(false);
@@ -486,28 +573,8 @@ function CandidateRow({ app, rank, jobStatus, onChanged }) {
           'bg-gray-50 text-gray-400'
         }`}>{rank}</div>
 
-        {/* Name + email + download */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="font-semibold text-gray-900 text-sm truncate">{app.candidate.name}</p>
-            {app.resumeFileUrl && (
-              <a
-                href={app.resumeFileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Download Resume"
-                className="p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-primary-600 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Download className="h-3.5 w-3.5" />
-              </a>
-            )}
-            <CandidateActions app={app} onChanged={onChanged} />
-          </div>
-          {app.candidate.email && (
-            <p className="text-xs text-gray-400 truncate">{app.candidate.email}</p>
-          )}
-        </div>
+        {/* Name + email + edit + download */}
+        <CandidateInfo app={app} onChanged={onChanged} />
 
         {/* Score pills — always visible */}
         <div className="flex items-center gap-2 flex-shrink-0">

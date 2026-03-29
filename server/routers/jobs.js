@@ -458,6 +458,32 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
       return { url: app.resumeFileUrl, name: app.candidate.name };
     }),
 
+  // HR edits candidate name / email
+  updateCandidate: protectedProcedure
+    .input(z.object({
+      applicationId: z.string(),
+      name: z.string().min(1).max(120).optional(),
+      email: z.string().email().optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const application = await prisma.application.findFirst({
+        where: {
+          id: input.applicationId,
+          jobPosting: { companyId: ctx.hrUser.companyId },
+        },
+        select: { candidateId: true },
+      });
+      if (!application) throw new Error('Application not found.');
+
+      const data = {};
+      if (input.name !== undefined) data.name = input.name.trim();
+      if (input.email !== undefined) data.email = input.email?.trim() || null;
+      if (Object.keys(data).length === 0) throw new Error('Nothing to update.');
+
+      await prisma.candidate.update({ where: { id: application.candidateId }, data });
+      return { success: true };
+    }),
+
   // Delete a job (only DRAFT with no applications)
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
