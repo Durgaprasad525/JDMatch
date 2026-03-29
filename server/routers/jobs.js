@@ -282,14 +282,17 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
                 contentType: 'application/pdf',
                 upsert: false,
               });
-            if (!uploadError && uploadData?.path) {
+            if (uploadError) {
+              console.error('Supabase Storage upload error:', JSON.stringify(uploadError));
+            } else if (uploadData?.path) {
               const { data: urlData } = supabaseAdmin.storage
                 .from('resumes')
                 .getPublicUrl(uploadData.path);
               resumeFileUrl = urlData?.publicUrl || null;
+              console.log('Resume stored:', resumeFileUrl);
             }
           } catch (storageErr) {
-            console.warn('Resume storage failed (non-blocking):', storageErr.message);
+            console.error('Resume storage exception:', storageErr.message);
           }
 
           const application = await prisma.application.create({
