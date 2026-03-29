@@ -486,10 +486,22 @@ function CandidateRow({ app, rank, jobStatus, onChanged }) {
           'bg-gray-50 text-gray-400'
         }`}>{rank}</div>
 
-        {/* Name + email */}
+        {/* Name + email + download */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="font-semibold text-gray-900 text-sm truncate">{app.candidate.name}</p>
+            {app.resumeFileUrl && (
+              <a
+                href={app.resumeFileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Download Resume"
+                className="p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-primary-600 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download className="h-3.5 w-3.5" />
+              </a>
+            )}
             <CandidateActions app={app} onChanged={onChanged} />
           </div>
           {app.candidate.email && (

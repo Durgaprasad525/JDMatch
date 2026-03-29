@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc.js';
 import prisma from '../lib/prisma.js';
+import { supabaseAdmin } from '../lib/supabase.js';
 import { parsePDF } from '../services/pdfService.js';
 import { analyzeDocuments } from '../services/analysisService.js';
 import { extractCandidateInfo } from '../services/candidateExtractor.js';
@@ -270,11 +271,33 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
             continue;
           }
 
+          // Upload resume PDF to Supabase Storage
+          let resumeFileUrl = null;
+          try {
+            const fileName = `${job.id}/${candidate.id}_${Date.now()}.pdf`;
+            const buffer = Buffer.from(input.cvFiles[i], 'base64');
+            const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+              .from('resumes')
+              .upload(fileName, buffer, {
+                contentType: 'application/pdf',
+                upsert: false,
+              });
+            if (!uploadError && uploadData?.path) {
+              const { data: urlData } = supabaseAdmin.storage
+                .from('resumes')
+                .getPublicUrl(uploadData.path);
+              resumeFileUrl = urlData?.publicUrl || null;
+            }
+          } catch (storageErr) {
+            console.warn('Resume storage failed (non-blocking):', storageErr.message);
+          }
+
           const application = await prisma.application.create({
             data: {
               jobPostingId: job.id,
               candidateId: candidate.id,
               resumeText: cvText,
+              resumeFileUrl,
               score: analysis.overallScore ?? null,
               strengths: analysis.strengths ?? [],
               weaknesses: analysis.weaknesses ?? [],
@@ -379,6 +402,27 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
       });
 
       return { success: true, updated: validIds.length };
+    }),
+
+  // Get a signed download URL for a candidate's resume
+  getResumeUrl: protectedProcedure
+    .input(z.object({ applicationId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const app = await prisma.application.findFirst({
+        where: {
+          id: input.applicationId,
+          jobPosting: { companyId: ctx.hrUser.companyId },
+        },
+        select: { resumeFileUrl: true, candidate: { select: { name: true } } },
+      });
+      if (!app) throw new Error('Application not found.');
+      if (!app.resumeFileUrl) throw new Error('No resume file stored for this candidate.');
+
+      // If it's a public URL, return it directly
+      // If you later switch to a private bucket, generate a signed URL:
+      // const filePath = app.resumeFileUrl.split('/resumes/')[1];
+      // const { data } = await supabaseAdmin.storage.from('resumes').createSignedUrl(filePath, 300);
+      return { url: app.resumeFileUrl, name: app.candidate.name };
     }),
 
   // Delete a job (only DRAFT with no applications)
