@@ -28,9 +28,26 @@ app.use(morgan('combined'));
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://jdm-atch-fvcajshzi-prasad-yallapus-projects.vercel.app'] 
-    : ['http://localhost:5173', 'http://localhost:3000'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    const allowed = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ];
+
+    // Allow any Vercel preview/production URL for this project
+    if (
+      origin.endsWith('.vercel.app') ||
+      allowed.includes(origin) ||
+      (process.env.APP_URL && origin === process.env.APP_URL)
+    ) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 
@@ -67,7 +84,12 @@ app.get('/health', (req, res) => {
 // Vapi webhook — plain POST route (bypasses tRPC for compatibility)
 app.post('/api/vapi-webhook', async (req, res) => {
   try {
-    await handleVapiWebhook(req.body);
+    const messageType = req.body?.message?.type || req.body?.type || 'unknown';
+    console.log(`[Vapi Webhook] type=${messageType}, callId=${req.body?.message?.call?.id || req.body?.call?.id || 'none'}`);
+
+    // Vapi may send the payload with or without the "message" wrapper
+    const body = req.body?.message ? req.body : { message: req.body };
+    await handleVapiWebhook(body);
     res.json({ received: true });
   } catch (err) {
     console.error('Vapi webhook error:', err.message);
