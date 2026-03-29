@@ -34,18 +34,28 @@ export function AuthProvider({ children }) {
       fetchHrUser(session?.access_token ?? null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const newUserId = session?.user?.id ?? null;
 
       // If user changed (sign-out, sign-in as different user), clear ALL cached data
       if (prevUserIdRef.current !== newUserId) {
         queryClient.clear(); // wipe entire react-query cache
+        prevUserIdRef.current = newUserId;
+        setSession(session);
+        setUser(session?.user ?? null);
+        fetchHrUser(session?.access_token ?? null);
+        return;
       }
       prevUserIdRef.current = newUserId;
 
+      // Only refresh session/user state, skip re-fetching hrUser on token refreshes
       setSession(session);
       setUser(session?.user ?? null);
-      fetchHrUser(session?.access_token ?? null);
+
+      // Only fetch hrUser on actual sign-in, not token refreshes
+      if (event === 'SIGNED_IN') {
+        fetchHrUser(session?.access_token ?? null);
+      }
     });
 
     return () => subscription.unsubscribe();
