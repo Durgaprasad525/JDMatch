@@ -178,7 +178,7 @@ function UploadTab({ description, setDescription, uploadError, setUploadError })
   );
 }
 
-function AITab({ description, setDescription }) {
+function AITab({ description, setDescription, onTitleGenerated }) {
   const [aiForm, setAIForm] = useState({
     title: '',
     department: '',
@@ -194,6 +194,10 @@ function AITab({ description, setDescription }) {
     onSuccess: (res) => {
       setDescription(res.description);
       setGenerated(true);
+      // Auto-fill the job title from the AI form's role title
+      if (aiForm.title.trim() && onTitleGenerated) {
+        onTitleGenerated(aiForm.title.trim());
+      }
     },
   });
 
@@ -465,7 +469,11 @@ export function CreateJobPage() {
               />
             )}
             {activeTab === 'ai' && (
-              <AITab description={description} setDescription={setDescription} />
+              <AITab
+                description={description}
+                setDescription={setDescription}
+                onTitleGenerated={(t) => { if (!title.trim()) setTitle(t); }}
+              />
             )}
           </div>
         </div>
