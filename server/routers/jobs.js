@@ -248,8 +248,38 @@ Do NOT include a company name — use "[Company Name]" as placeholder.`
             Promise.resolve(extractCandidateInfo(cvText)),
           ]);
 
-          const name = analysis.candidateName || candidateInfo.name || `Candidate ${i + 1}`;
-          const email = analysis.candidateEmail || candidateInfo.email || null;
+          // Validate AI-extracted name/email — reject obviously bad values
+          const isValidName = (n) =>
+            n &&
+            typeof n === 'string' &&
+            n.length >= 2 &&
+            n.length <= 80 &&
+            !n.toLowerCase().includes('please see') &&
+            !n.toLowerCase().includes('attached') &&
+            !n.toLowerCase().includes('candidate name') &&
+            !n.toLowerCase().includes('not found') &&
+            !n.toLowerCase().includes('not available') &&
+            !n.toLowerCase().includes('n/a') &&
+            !n.toLowerCase().includes('unknown') &&
+            !n.toLowerCase().includes('pdf content') &&
+            !n.toLowerCase().startsWith('candidate ') &&
+            !/^\d+$/.test(n);
+
+          const isValidEmail = (e) =>
+            e &&
+            typeof e === 'string' &&
+            /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) &&
+            !e.toLowerCase().includes('please') &&
+            !e.toLowerCase().includes('attached') &&
+            !e.toLowerCase().includes('example.com');
+
+          const aiName = isValidName(analysis.candidateName) ? analysis.candidateName : null;
+          const aiEmail = isValidEmail(analysis.candidateEmail) ? analysis.candidateEmail : null;
+          const regexName = isValidName(candidateInfo.name) ? candidateInfo.name : null;
+          const regexEmail = isValidEmail(candidateInfo.email) ? candidateInfo.email : null;
+
+          const name = aiName || regexName || `Candidate ${i + 1}`;
+          const email = aiEmail || regexEmail || null;
 
           // Find or create candidate (atomic to prevent duplicates)
           let candidate;

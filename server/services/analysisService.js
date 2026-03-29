@@ -361,7 +361,9 @@ IMPORTANT SCORING GUIDELINES:
 - If the candidate is clearly NOT suitable (e.g., wrong field, lacks core requirements), the score should be LOW (0-30), NOT high.
 - alignmentScores: Object with scores from 0-1 (where 1 = perfect match) for each requirement category mentioned in the job description.
 
-Extract the candidate's name and email from the CV. The candidateName should be the person's full name, and candidateEmail should be their email address.
+CRITICAL: Extract the candidate's ACTUAL full name and email address from the CV text below.
+- candidateName: The person's real full name (e.g. "John Smith"). Do NOT return placeholder text like "Please see attached CV" or "N/A". If you cannot find a name, return null.
+- candidateEmail: The person's actual email address (e.g. "john@example.com"). If you cannot find an email, return null.
 
 Job Description: ${jobDescription}
 

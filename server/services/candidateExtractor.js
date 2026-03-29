@@ -30,50 +30,67 @@ export function extractEmail(text) {
  */
 export function extractName(text) {
   if (!text || typeof text !== 'string') return null;
-  
+
   // Split into lines and get first few lines (usually contains name)
   const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-  
+
   if (lines.length === 0) return null;
-  
-  // Check first 5 lines for name (usually at the top)
-  for (let i = 0; i < Math.min(5, lines.length); i++) {
+
+  const skipWords = [
+    'resume', 'cv', 'curriculum', 'vitae', 'phone', 'email', 'address',
+    'objective', 'summary', 'experience', 'education', 'skills', 'profile',
+    'please', 'attached', 'dear', 'sir', 'madam', 'http', 'www', 'linkedin'
+  ];
+
+  // Check first 8 lines for name (usually at the top)
+  for (let i = 0; i < Math.min(8, lines.length); i++) {
     const line = lines[i];
-    
+    const lower = line.toLowerCase();
+
     // Skip lines that are clearly not names
     if (
-      line.toLowerCase().includes('resume') ||
-      line.toLowerCase().includes('cv') ||
-      line.toLowerCase().includes('curriculum') ||
-      line.toLowerCase().includes('phone') ||
-      line.toLowerCase().includes('email') ||
-      line.toLowerCase().includes('address') ||
-      line.match(/^\d+/) || // Starts with number
-      line.length > 100 || // Too long to be a name
-      line.match(/^[A-Z\s]{20,}$/) // All caps and too long (likely a header)
+      skipWords.some(w => lower.includes(w)) ||
+      line.match(/^\d/) ||           // Starts with number
+      line.match(/@/) ||             // Contains email
+      line.match(/^\+?\d[\d\s-]+/) || // Phone number
+      line.length > 60 ||            // Too long to be a name
+      line.length < 3 ||             // Too short
+      line.split(/\s+/).length > 5   // Too many words
     ) {
       continue;
     }
-    
-    // Check if line looks like a name (2-4 words, proper case, no special chars except hyphens/apostrophes)
-    const namePattern = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}$/;
-    if (namePattern.test(line)) {
+
+    // Proper case: "John Smith", "Mary Jane O'Brien"
+    if (/^[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?){0,3}$/.test(line)) {
       return line;
     }
-    
-    // Also check for names with hyphens or apostrophes
-    const namePatternExtended = /^[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?(?:\s+[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?){0,2}$/;
-    if (namePatternExtended.test(line)) {
+
+    // ALL CAPS name: "JOHN SMITH" → convert to title case
+    if (/^[A-Z]{2,}(?:\s+[A-Z]{2,}){0,3}$/.test(line) && line.length < 40) {
+      return line.split(/\s+/).map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+    }
+
+    // Mixed: "JOHN smith" or "john SMITH" — 2-4 words, all alpha
+    if (/^[A-Za-z]+(?:\s+[A-Za-z]+){0,3}$/.test(line) && line.length < 40 && line.split(/\s+/).length >= 2) {
+      return line.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    }
+  }
+
+  // Fallback: first reasonable line that looks name-like (2+ alpha words, short)
+  for (let i = 0; i < Math.min(3, lines.length); i++) {
+    const line = lines[i];
+    if (
+      line.length >= 3 &&
+      line.length < 50 &&
+      /^[A-Za-z]/.test(line) &&
+      line.split(/\s+/).length >= 2 &&
+      line.split(/\s+/).length <= 4 &&
+      !skipWords.some(w => line.toLowerCase().includes(w))
+    ) {
       return line;
     }
   }
-  
-  // Fallback: return first non-empty line if it's reasonable
-  const firstLine = lines[0];
-  if (firstLine && firstLine.length > 2 && firstLine.length < 80 && !firstLine.match(/^[^A-Za-z]/)) {
-    return firstLine;
-  }
-  
+
   return null;
 }
 
